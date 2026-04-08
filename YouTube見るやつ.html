@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube Player (h5)</title>
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      color: #fff;
+      font-family: sans-serif;
+    }
+    .container {
+      padding: 10px;
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      font-size: 16px;
+    }
+    iframe {
+      width: 100%;
+      height: 220px;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <input id="url" placeholder="YouTubeのURLを貼ってね">
+    <button onclick="loadVideo()">再生</button>
+    <iframe id="player" allowfullscreen></iframe>
+  </div>
+
+  <script>
+    function loadVideo() {
+      const url = document.getElementById("url").value;
+      const idMatch = url.match(/(v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+      if (!idMatch) {
+        alert("YouTubeのURLじゃないかも");
+        return;
+      }
+      const videoId = idMatch[2];
+      document.getElementById("player").src =
+        "https://www.youtube.com/embed/" + videoId;
+    }
+  </script>
+</body>
+</html>
