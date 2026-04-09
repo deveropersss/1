@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>YT Player v5</title>
+<title>YT Player v6</title>
 
 <style>
 body {
@@ -104,6 +104,12 @@ iframe {
   color: #aaa;
 }
 
+.load-more {
+  width: 100%;
+  margin-top: 10px;
+  background: #222;
+}
+
 .modal {
   display: none;
   position: fixed;
@@ -131,7 +137,7 @@ iframe {
 <div class="container">
 
   <div class="header">
-    <h3>YT Player v5</h3>
+    <h3>YT Player v6</h3>
     <button class="update-btn" onclick="openModal()">Updates</button>
   </div>
 
@@ -143,6 +149,7 @@ iframe {
   <iframe id="player"></iframe>
   <div id="nowTitle"></div>
   <div id="results"></div>
+  <button class="load-more" onclick="searchVideos(true)">Load More</button>
 
 </div>
 
@@ -150,14 +157,15 @@ iframe {
   <div class="modal-content">
     <h3>アップデート履歴</h3>
     <p>
+    v6:<br>
+    ・50件以上の読み込み対応（Load More）<br>
+    ・動画時間表示<br><br>
     v5:<br>
-    ・動画の再生時間を表示<br>
-    ・UI改善<br><br>
+    ・再生時間表示追加<br><br>
     v4:<br>
-    ・英語UI化<br><br>
-v3:<br>
-    ・動画の検索結果を10→50に変更<br>
-    ・UI改善<br>
+    ・英語UI化<br>
+    ・更新ボタン追加<br>
+    ・検索結果を10→50に変更
     </p>
     <button onclick="closeModal()">Close</button>
   </div>
@@ -167,6 +175,8 @@ v3:<br>
 const API_KEY = "AIzaSyAtIXjgWJ4J_5yHefy7X-aFQQN3-Ub6zQs";
 
 let currentVideo = null;
+let nextPageToken = "";
+let currentQuery = "";
 
 document.getElementById("search").addEventListener("keydown", e => {
   if (e.key === "Enter") searchVideos();
@@ -197,17 +207,23 @@ function playVideo(videoId, element, title) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-async function searchVideos() {
+async function searchVideos(loadMore = false) {
   const query = document.getElementById("search").value;
   const resultsDiv = document.getElementById("results");
 
-  resultsDiv.innerHTML = "Searching...";
+  if (!loadMore) {
+    resultsDiv.innerHTML = "Searching...";
+    nextPageToken = "";
+    currentQuery = query;
+  }
 
-  const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${encodeURIComponent(query)}&maxResults=50&key=${API_KEY}`;
+  const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${encodeURIComponent(currentQuery)}&maxResults=50&pageToken=${nextPageToken}&key=${API_KEY}`;
 
   try {
     const res = await fetch(searchUrl);
     const data = await res.json();
+
+    nextPageToken = data.nextPageToken || "";
 
     const ids = data.items.map(item => item.id.videoId).join(",");
 
@@ -219,8 +235,6 @@ async function searchVideos() {
     detailData.items.forEach(item => {
       durations[item.id] = formatDuration(item.contentDetails.duration);
     });
-
-    resultsDiv.innerHTML = "";
 
     data.items.forEach(item => {
       const videoId = item.id.videoId;
@@ -239,9 +253,7 @@ async function searchVideos() {
         </div>
       `;
 
-      div.onclick = () => {
-        playVideo(videoId, div, title);
-      };
+      div.onclick = () => playVideo(videoId, div, title);
 
       resultsDiv.appendChild(div);
     });
