@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>YT Player v6</title>
+<title>YT Player v7</title>
 
 <style>
 body {
@@ -84,6 +84,11 @@ iframe {
   background: #1a1a1a;
   padding: 8px;
   border-radius: 10px;
+  transition: 0.2s;
+}
+
+.video:hover {
+  transform: scale(1.03);
 }
 
 .video.active {
@@ -102,12 +107,6 @@ iframe {
 .video-time {
   font-size: 12px;
   color: #aaa;
-}
-
-.load-more {
-  width: 100%;
-  margin-top: 10px;
-  background: #222;
 }
 
 .modal {
@@ -137,7 +136,7 @@ iframe {
 <div class="container">
 
   <div class="header">
-    <h3>YT Player v6</h3>
+    <h3>YT Player v7</h3>
     <button class="update-btn" onclick="openModal()">Updates</button>
   </div>
 
@@ -146,10 +145,9 @@ iframe {
     <button onclick="searchVideos()">Search</button>
   </div>
 
-  <iframe id="player"></iframe>
+  <iframe id="player" allow="autoplay; encrypted-media" allowfullscreen></iframe>
   <div id="nowTitle"></div>
   <div id="results"></div>
-  <button class="load-more" onclick="searchVideos(true)">Load More</button>
 
 </div>
 
@@ -157,16 +155,16 @@ iframe {
   <div class="modal-content">
     <h3>アップデート履歴</h3>
     <p>
+    v7:<br>
+    ・無限スクロール追加<br>
+    ・再生回数、チャンネル名表示追加<br><br>
     v6:<br>
     ・50件以上の読み込み対応（Load More）<br>
     ・動画時間表示<br><br>
     v5:<br>
-    ・再生時間表示追加<br><br>
-    v4:<br>
-    ・英語UI化<br>
-    ・更新ボタン追加<br>
-    ・検索結果を10→50に変更
-    </p>
+    ・再生時間表示追加<br>
+・検索結果を10→50に変更
+   </p>
     <button onclick="closeModal()">Close</button>
   </div>
 </div>
@@ -177,6 +175,7 @@ const API_KEY = "AIzaSyAtIXjgWJ4J_5yHefy7X-aFQQN3-Ub6zQs";
 let currentVideo = null;
 let nextPageToken = "";
 let currentQuery = "";
+let isLoading = false;
 
 document.getElementById("search").addEventListener("keydown", e => {
   if (e.key === "Enter") searchVideos();
@@ -208,11 +207,14 @@ function playVideo(videoId, element, title) {
 }
 
 async function searchVideos(loadMore = false) {
+  if (isLoading) return;
+  isLoading = true;
+
   const query = document.getElementById("search").value;
   const resultsDiv = document.getElementById("results");
 
   if (!loadMore) {
-    resultsDiv.innerHTML = "Searching...";
+    resultsDiv.innerHTML = "Loading...";
     nextPageToken = "";
     currentQuery = query;
   }
@@ -227,20 +229,26 @@ async function searchVideos(loadMore = false) {
 
     const ids = data.items.map(item => item.id.videoId).join(",");
 
-    const detailUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${ids}&key=${API_KEY}`;
+    const detailUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,snippet,statistics&id=${ids}&key=${API_KEY}`;
     const detailRes = await fetch(detailUrl);
     const detailData = await detailRes.json();
 
-    const durations = {};
+    const videoMap = {};
     detailData.items.forEach(item => {
-      durations[item.id] = formatDuration(item.contentDetails.duration);
+      videoMap[item.id] = item;
     });
+
+    if (!loadMore) resultsDiv.innerHTML = "";
 
     data.items.forEach(item => {
       const videoId = item.id.videoId;
+      const detail = videoMap[videoId];
+
       const title = item.snippet.title;
       const thumb = item.snippet.thumbnails.medium.url;
-      const time = durations[videoId] || "--:--";
+      const time = detail ? formatDuration(detail.contentDetails.duration) : "--:--";
+      const views = detail ? Number(detail.statistics.viewCount).toLocaleString() : "0";
+      const channel = detail ? detail.snippet.channelTitle : "";
 
       const div = document.createElement("div");
       div.className = "video";
@@ -249,7 +257,8 @@ async function searchVideos(loadMore = false) {
         <img src="${thumb}">
         <div>
           <div class="video-title">${title}</div>
-          <div class="video-time">${time}</div>
+          <div class="video-time">${time} • ${views} views</div>
+          <div class="video-time">${channel}</div>
         </div>
       `;
 
@@ -261,7 +270,16 @@ async function searchVideos(loadMore = false) {
   } catch {
     resultsDiv.innerHTML = "Error";
   }
+
+  isLoading = false;
 }
+
+
+window.addEventListener("scroll", () => {
+  if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 300) {
+    if (nextPageToken) searchVideos(true);
+  }
+});
 
 function openModal() {
   document.getElementById("modal").style.display = "flex";
