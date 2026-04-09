@@ -1,51 +1,264 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YouTube Player (h5)</title>
-  <style>
-    body {
-      margin: 0;
-      background: #000;
-      color: #fff;
-      font-family: sans-serif;
-    }
-    .container {
-      padding: 10px;
-    }
-    input, button {
-      width: 100%;
-      padding: 10px;
-      margin-bottom: 10px;
-      font-size: 16px;
-    }
-    iframe {
-      width: 100%;
-      height: 220px;
-      border: none;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YT Player v5</title>
+
+<style>
+body {
+  margin: 0;
+  background: #0f0f0f;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.container {
+  padding: 15px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.update-btn {
+  background: #1f1f1f;
+  border: none;
+  color: #aaa;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.search-box {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+  position: sticky;
+  top: 0;
+  background: #0f0f0f;
+  z-index: 10;
+  padding-top: 10px;
+}
+
+input {
+  flex: 1;
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  background: #1f1f1f;
+  color: #fff;
+  font-size: 16px;
+}
+
+button {
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: none;
+  background: #ff0000;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+iframe {
+  width: 100%;
+  aspect-ratio: 16/9;
+  border-radius: 12px;
+  margin-bottom: 10px;
+}
+
+#nowTitle {
+  margin-bottom: 10px;
+  font-weight: bold;
+}
+
+.video {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  background: #1a1a1a;
+  padding: 8px;
+  border-radius: 10px;
+}
+
+.video.active {
+  border: 2px solid #ff0000;
+}
+
+.video img {
+  width: 140px;
+  border-radius: 8px;
+}
+
+.video-title {
+  font-size: 14px;
+}
+
+.video-time {
+  font-size: 12px;
+  color: #aaa;
+}
+
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.8);
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background: #1f1f1f;
+  padding: 20px;
+  border-radius: 10px;
+  width: 80%;
+  max-width: 400px;
+}
+</style>
 </head>
+
 <body>
-  <div class="container">
-    <input id="url" placeholder="YouTubeのURLを貼ってね">
-    <button onclick="loadVideo()">再生</button>
-    <iframe id="player" allowfullscreen></iframe>
+
+<div class="container">
+
+  <div class="header">
+    <h3>YT Player v5</h3>
+    <button class="update-btn" onclick="openModal()">Updates</button>
   </div>
 
-  <script>
-    function loadVideo() {
-      const url = document.getElementById("url").value;
-      const idMatch = url.match(/(v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
-      if (!idMatch) {
-        alert("YouTubeのURLじゃないかも");
-        return;
-      }
-      const videoId = idMatch[2];
-      document.getElementById("player").src =
-        "https://www.youtube.com/embed/" + videoId;
-    }
-  </script>
+  <div class="search-box">
+    <input id="search" placeholder="Search videos">
+    <button onclick="searchVideos()">Search</button>
+  </div>
+
+  <iframe id="player"></iframe>
+  <div id="nowTitle"></div>
+  <div id="results"></div>
+
+</div>
+
+<div class="modal" id="modal">
+  <div class="modal-content">
+    <h3>アップデート履歴</h3>
+    <p>
+    v5:<br>
+    ・動画の再生時間を表示<br>
+    ・UI改善<br><br>
+    v4:<br>
+    ・英語UI化<br><br>
+v3:<br>
+    ・動画の検索結果を10→50に変更<br>
+    ・UI改善<br>
+    </p>
+    <button onclick="closeModal()">Close</button>
+  </div>
+</div>
+
+<script>
+const API_KEY = "AIzaSyAtIXjgWJ4J_5yHefy7X-aFQQN3-Ub6zQs";
+
+let currentVideo = null;
+
+document.getElementById("search").addEventListener("keydown", e => {
+  if (e.key === "Enter") searchVideos();
+});
+
+function formatDuration(duration) {
+  const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+
+  const h = (match[1] || "0H").replace("H","");
+  const m = (match[2] || "0M").replace("M","");
+  const s = (match[3] || "0S").replace("S","");
+
+  return h > 0
+    ? `${h}:${m.padStart(2,"0")}:${s.padStart(2,"0")}`
+    : `${m}:${s.padStart(2,"0")}`;
+}
+
+function playVideo(videoId, element, title) {
+  document.getElementById("player").src =
+    `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+
+  document.getElementById("nowTitle").textContent = title;
+
+  if (currentVideo) currentVideo.classList.remove("active");
+  element.classList.add("active");
+  currentVideo = element;
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function searchVideos() {
+  const query = document.getElementById("search").value;
+  const resultsDiv = document.getElementById("results");
+
+  resultsDiv.innerHTML = "Searching...";
+
+  const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${encodeURIComponent(query)}&maxResults=50&key=${API_KEY}`;
+
+  try {
+    const res = await fetch(searchUrl);
+    const data = await res.json();
+
+    const ids = data.items.map(item => item.id.videoId).join(",");
+
+    const detailUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${ids}&key=${API_KEY}`;
+    const detailRes = await fetch(detailUrl);
+    const detailData = await detailRes.json();
+
+    const durations = {};
+    detailData.items.forEach(item => {
+      durations[item.id] = formatDuration(item.contentDetails.duration);
+    });
+
+    resultsDiv.innerHTML = "";
+
+    data.items.forEach(item => {
+      const videoId = item.id.videoId;
+      const title = item.snippet.title;
+      const thumb = item.snippet.thumbnails.medium.url;
+      const time = durations[videoId] || "--:--";
+
+      const div = document.createElement("div");
+      div.className = "video";
+
+      div.innerHTML = `
+        <img src="${thumb}">
+        <div>
+          <div class="video-title">${title}</div>
+          <div class="video-time">${time}</div>
+        </div>
+      `;
+
+      div.onclick = () => {
+        playVideo(videoId, div, title);
+      };
+
+      resultsDiv.appendChild(div);
+    });
+
+  } catch {
+    resultsDiv.innerHTML = "Error";
+  }
+}
+
+function openModal() {
+  document.getElementById("modal").style.display = "flex";
+}
+
+function closeModal() {
+  document.getElementById("modal").style.display = "none";
+}
+</script>
+
 </body>
 </html>
